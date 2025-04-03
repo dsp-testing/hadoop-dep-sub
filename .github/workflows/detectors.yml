@@ -63,7 +63,7 @@ jobs:
           fi
 
       - name: submit-dependency-snapshot
-        uses: actions/maven-dependency-submission-action@juxtin/prep-412
+        uses: actions/maven-dependency-submission-action@48f232b0d166d6cb58cc1289390a4959d82266d1
         with:
           detector-name: Automatic Dependency Submission
           detector-version: 6.6.6
