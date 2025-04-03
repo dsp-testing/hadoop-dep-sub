@@ -1304,11 +1304,6 @@
         <version>1.10.19</version>
       </dependency>
       <dependency>
-        <groupId>org.mockito</groupId>
-        <artifactId>mockito-junit-jupiter</artifactId>
-        <version>3.12.4</version>
-      </dependency>
-      <dependency>
         <groupId>org.objenesis</groupId>
         <artifactId>objenesis</artifactId>
         <version>2.6</version>
