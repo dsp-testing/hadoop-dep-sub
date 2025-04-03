@@ -3,13 +3,71 @@ on:
   push:
 permissions:
   contents: write
-
+env:
+  JAVA_VERSION: 21
+  JAVA_DISTRIB: "temurin"
+  SKIP_CACHE: ${{ vars.GH_DEPENDENCY_SUBMISSION_SKIP_CACHE }}
 jobs:
-  syft-detection:
-    runs-on: ubuntu-latest
+  submit-maven:
+    runs-on: ${{ github.event.inputs.runs-on }}
+    timeout-minutes: 90
     steps:
-      - name: 'Checkout Repository'
-        uses: actions/checkout@v3
-      - name: Maven Dependency Submission
-        uses: advanced-security/maven-dependency-submission-action@main
-        
+      - name: checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.inputs.commit-sha }}
+
+      - name: setup-ecosystem
+        uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355ba6c12 # v4.7.0
+        with:
+          overwrite-settings: false
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: ${{ env.JAVA_DISTRIB }}
+
+      - name: log-toolchain-versions
+        run: |
+          version=$(mvn -q -v)
+          echo "::notice::Using Java ${{ env.JAVA_VERSION }} (${{ env.JAVA_DISTRIB }}) with Maven ${version}"
+        shell: bash
+
+      - name: check-cache-strategy
+        run: |
+          if [[ -n "${{ env.SKIP_CACHE }}" ]]; then
+            echo "actions/cache disabled via 'GH_DEPENDENCY_SUBMISSION_SKIP_CACHE'"
+          else
+            echo "Caching '~/.m2/repository'. Set 'GH_DEPENDENCY_SUBMISSION_SKIP_CACHE=true' to skip caching in future."
+          fi
+
+      - name: configure-cache
+        if: ${{ !env.SKIP_CACHE }}
+        uses: actions/cache@0c907a75c2c80ebcb7f088228285e798b750cf8f # v4.2.1
+        with:
+          path: "~/.m2/repository"
+          key: ${{ runner.os }}-jdk${{ env.JAVA_VERSION }}-${{ env.JAVA_DISTRIB }}-maven${{ steps.current-maven.version }}-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-jdk${{ env.JAVA_VERSION }}-${{ env.JAVA_DISTRIB }}-maven${{ steps.current-maven.version }}-
+
+      - name: validate-project
+        run: |
+          if mvn validate -B -Denforcer.skip=true -Dcheckstyle.skip=true -Dlicense.skip=true; then
+            echo "::debug::mvn validate indicates repository root is a Maven project."
+            echo "{valid-project}={true}" >> "$GITHUB_OUTPUT"
+          else
+            echo "::debug::mvn validate indicates repository root is not a Maven project."
+            echo "{valid-project}={false}" >> "$GITHUB_OUTPUT"
+            echo "### :warning: Maven validate failed in repository root" >> $GITHUB_STEP_SUMMARY
+            echo "We were unable to validate a pom.xml in the repository root. If your repository requires additional setup steps, you may need to check in your own workflow." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "For more information on submitting Maven dependencies from your own workflow, refer to [the submission action](https://github.com/advanced-security/maven-dependency-submission-action)" >> $GITHUB_STEP_SUMMARY
+            echo "::warning:: Maven validate failed in the repository root."
+            exit 1
+          fi
+
+      - name: submit-dependency-snapshot
+        uses: actions/maven-dependency-submission-action@main
+        with:
+          snapshot-sha: ${{ github.event.inputs.commit-sha }}
+          snapshot-ref: ${{ github.event.inputs.commit-ref }}
+          detector-name: Automatic Dependency Submission
+          detector-version: ${{ github.event.inputs.detector-version }}
+          detector-url: https://github.com/actions/maven-dependency-submission-action
+          ignore-maven-wrapper: true
