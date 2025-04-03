@@ -65,9 +65,7 @@ jobs:
       - name: submit-dependency-snapshot
         uses: actions/maven-dependency-submission-action@main
         with:
-          snapshot-sha: ${{ github.event.inputs.commit-sha }}
-          snapshot-ref: ${{ github.event.inputs.commit-ref }}
           detector-name: Automatic Dependency Submission
-          detector-version: ${{ github.event.inputs.detector-version }}
+          detector-version: 6.6.6
           detector-url: https://github.com/actions/maven-dependency-submission-action
           ignore-maven-wrapper: true
